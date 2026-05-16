@@ -1,0 +1,113 @@
+# ========================================
+# Python
+# ========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# ========================================
+# IDE & Editor
+# ========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*\~
+.DS_Store
+Thumbs.db
+
+# ========================================
+# Project Specific
+# ========================================
+data.json
+*.json.bak
+cache/
+temp/
+logs/
+*.log
+
+# Database & Sessions (if any)
+*.db
+*.sqlite3
+session/
+
+# ========================================
+# Secrets & Environment
+# ========================================
+.env
+.env.*
+*.env
+!.env.example
+
+# API Keys & Credentials
+config.py
+secrets.py
+credentials.json
+*.pem
+*.key
+
+# ========================================
+# Byte-compiled & Optimized files
+# ========================================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ========================================
+# Testing & Coverage
+# ========================================
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+
+# ========================================
+# Packaging & Distribution
+# ========================================
+*.tar.gz
+*.whl
+*.egg-info/
+
+# ========================================
+# Telegram Bot Specific (Optional but useful)
+# ========================================
+bot_data/
+user_data/
+conversation_data/
+*.session
+*.session-journal
+
+# ========================================
+# Miscellaneous
+# ========================================
+*.bak
+*.tmp
+*.temp

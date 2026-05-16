@@ -17,27 +17,27 @@ from telegram.ext import (
 import db
 from messages import LANGUAGES, get_message
 
-TOKEN = "YOUR_TELEGRAM_BOT_TOKEN_HERE"
+TOKEN = "8749828678:AAFOWOMvACgYbCojSEd-ks5DqpVcoKGjGXE"
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ====== COIN MAP ======
 COINS = {
-    "BTC": {"id": "bitcoin", "name": "Bitcoin"},
-    "ETH": {"id": "ethereum", "name": "Ethereum"},
-    "USDT": {"id": "tether", "name": "Tether"},
-    "SOL": {"id": "solana", "name": "Solana"},
-    "BNB": {"id": "binancecoin", "name": "BNB Coin"},
-    "XRP": {"id": "ripple", "name": "XRP"},
-    "TON": {"id": "the-open-network", "name": "Toncoin"},
-    "DOGE": {"id": "dogecoin", "name": "Dogecoin"},
-    "ADA": {"id": "cardano", "name": "Cardano"},
-    "TRX": {"id": "tron", "name": "TRON"},
-    "AVAX": {"id": "avalanche-2", "name": "Avalanche"},
-    "LINK": {"id": "chainlink", "name": "Chainlink"},
-    "DOT": {"id": "polkadot", "name": "Polkadot"},
-    "MATIC": {"id": "polygon-ecosystem-token", "name": "Polygon"},
-    "LTC": {"id": "litecoin", "name": "Litecoin"}
+    "BTC": {"id": "BTC", "name": "Bitcoin"},
+    "ETH": {"id": "ETH", "name": "Ethereum"},
+    "USDT": {"id": "USDT", "name": "Tether"},
+    "SOL": {"id": "SOL", "name": "Solana"},
+    "BNB": {"id": "BNB", "name": "BNB Coin"},
+    "XRP": {"id": "XRP", "name": "XRP"},
+    "TON": {"id": "TON", "name": "Toncoin"},
+    "DOGE": {"id": "DOGE", "name": "Dogecoin"},
+    "ADA": {"id": "ADA", "name": "Cardano"},
+    "TRX": {"id": "TRX", "name": "TRON"},
+    "AVAX": {"id": "AVAX", "name": "Avalanche"},
+    "LINK": {"id": "LINK", "name": "Chainlink"},
+    "DOT": {"id": "DOT", "name": "Polkadot"},
+    "MATIC": {"id": "POL", "name": "Polygon"},
+    "LTC": {"id": "LTC", "name": "Litecoin"}
 }
 
 # ====== LANGUAGES ======
@@ -73,55 +73,142 @@ def format_large_number(num):
     else:
         return f"${num:,.2f}"
 
-def generate_chart(coin_id, coin_name):
-    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart?vs_currency=usd&days=1"
-    res = requests.get(url, timeout=20)
+def get_binance_price(symbol: str):
+    """Get current price from Binance"""
+    url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}"
+    res = requests.get(url, timeout=15)
     res.raise_for_status()
     data = res.json()
-    prices = data.get("prices", [])
+    return {
+        "current_price": float(data["lastPrice"]),
+        "price_change_percent": float(data["priceChangePercent"]),
+        "high_24h": float(data["highPrice"]),
+        "low_24h": float(data["lowPrice"]),
+        "volume": float(data["volume"]),
+        "market_cap": None 
+    }
+
+
+def get_bitget_price(symbol: str):
+    """Get current price from Bitget as fallback"""
+    url = f"https://api.bitget.com/api/v2/spot/market/tickers?symbol={symbol}"
+    res = requests.get(url, timeout=15)
+    res.raise_for_status()
+    data = res.json()
     
-    if not prices:
+    if data.get("code") != "00000":
+        raise ValueError("Bitget API error")
+    
+    ticker = data["data"][0]
+    return {
+        "current_price": float(ticker["lastPr"]),
+        "price_change_percent": float(ticker["change24h"]),
+        "high_24h": float(ticker["high24h"]),
+        "low_24h": float(ticker["low24h"]),
+        "volume": float(ticker["baseVolume"]),
+        "market_cap": None
+    }
+
+
+def get_price(coin_id, currency="usd"):
+    """Get coin price - Binance Primary, Bitget Fallback"""
+    symbol = f"{coin_id}USDT"
+    
+    # Try Binance First
+    try:
+        data = get_binance_price(symbol)
+        print(f"✅ Binance price fetched for {coin_id}")
+        return {
+            "symbol": coin_id,
+            "current_price": data["current_price"],
+            "price_change_percentage_24h": data["price_change_percent"],
+            "high_24h": data["high_24h"],
+            "low_24h": data["low_24h"],
+            "total_volume": data["volume"],
+            "market_cap": data["market_cap"]
+        }
+    except Exception as e:
+        print(f"⚠️ Binance failed for {coin_id}: {e}")
+
+    # Fallback to Bitget
+    try:
+        data = get_bitget_price(symbol)
+        print(f"✅ Bitget price fetched for {coin_id} (fallback)")
+        return {
+            "symbol": coin_id,
+            "current_price": data["current_price"],
+            "price_change_percentage_24h": data["price_change_percent"],
+            "high_24h": data["high_24h"],
+            "low_24h": data["low_24h"],
+            "total_volume": data["volume"],
+            "market_cap": data["market_cap"]
+        }
+    except Exception as e:
+        print(f"❌ Both Binance and Bitget failed for {coin_id}: {e}")
+        raise ValueError(f"No price data available for {coin_id}")
+
+
+def generate_chart(coin_id, coin_name):
+    """Generate 24h chart - Binance Primary, Bitget Fallback"""
+    symbol = f"{coin_id}USDT"
+    
+    # Try Binance First
+    try:
+        url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=5m&limit=288"
+        res = requests.get(url, timeout=20)
+        res.raise_for_status()
+        data = res.json()
+        print(f"✅ Binance chart data fetched for {coin_name}")
+    except Exception as e:
+        print(f"⚠️ Binance chart failed: {e}")
+        # Fallback to Bitget
+        try:
+            url = f"https://api.bitget.com/api/v2/spot/market/candles?symbol={symbol}&granularity=5m&limit=288"
+            res = requests.get(url, timeout=20)
+            res.raise_for_status()
+            raw_data = res.json()
+            
+            if raw_data.get("code") != "00000":
+                raise ValueError("Bitget API error")
+                
+            data = raw_data["data"]  # Bitget returns list of lists
+            print(f"✅ Bitget chart data fetched for {coin_name} (fallback)")
+        except Exception as e2:
+            print(f"❌ Both exchanges failed for chart: {e2}")
+            return None
+
+    # Process data (both Binance and Bitget return similar structure)
+    if not data:
         return None
-        
-    times = [datetime.fromtimestamp(p[0]/1000.0, tz=timezone.utc) for p in prices]
-    vals = [p[1] for p in prices]
-    
+
+    times = [datetime.fromtimestamp(int(p[0])/1000.0, tz=timezone.utc) for p in data]
+    vals = [float(p[4]) for p in data]   # Close price (index 4)
+
     is_up = vals[-1] >= vals[0]
     color = '#2ecc71' if is_up else '#e74c3c'
-    
+
     plt.figure(figsize=(10, 5), facecolor='#1e1e1e')
     ax = plt.axes()
     ax.set_facecolor('#1e1e1e')
-    
-    plt.plot(times, vals, color=color, linewidth=2)
-    plt.fill_between(times, vals, min(vals)*0.99, color=color, alpha=0.1)
-    
-    plt.title(f"{coin_name} - 24h Price Chart", color='white', pad=20, fontsize=16, fontweight='bold')
+
+    plt.plot(times, vals, color=color, linewidth=2.2)
+    plt.fill_between(times, vals, min(vals)*0.99, color=color, alpha=0.12)
+
+    plt.title(f"{coin_name.upper()} - 24h Price Chart", color='white', pad=20, fontsize=16, fontweight='bold')
     plt.grid(color='#333333', linestyle='--', alpha=0.5)
-    
+
     ax.tick_params(colors='#888888', which='both')
     for spine in ax.spines.values():
         spine.set_color('#333333')
-        
+
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-    
+
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', bbox_inches='tight', dpi=100, facecolor='#1e1e1e')
+    plt.savefig(buf, format='png', bbox_inches='tight', dpi=120, facecolor='#1e1e1e')
     buf.seek(0)
     plt.close('all')
-    
+
     return buf
-
-def get_price(coin_id, currency="usd"):
-    url = f"https://api.coingecko.com/api/v3/coins/markets?vs_currency={currency}&ids={coin_id}"
-    res = requests.get(url, timeout=20)
-    res.raise_for_status()
-    data = res.json()
-    print(f"Api call happened {data} for {coin_id} {currency}")
-    if not data:
-        raise ValueError(f"No price data found for {coin_id}")
-
-    return data[0]
 
 
 def get_news():
